@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>커버 에디터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style>
+:root {
+  --bg: #0a0a0a; --bg2: #111; --bg3: #181818; --bg4: #222;
+  --fg: #e8e8e8; --fg2: #999; --fg3: #666;
+  --accent: #6366f1; --accent2: #818cf8;
+  --danger: #ef4444; --success: #4ade80;
+  --radius: 10px; --safe-b: env(safe-area-inset-bottom, 0px);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--fg); overflow: hidden; height: 100dvh; display: flex; flex-direction: column; }
+button, select, input { font-family: inherit; }
+
+/* ─── DESKTOP: side-by-side ─── */
+.app { display: flex; flex: 1; overflow: hidden; }
+.preview-area {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  background: var(--bg2); position: relative; overflow: hidden; padding: 16px;
+}
+.canvas-wrap { position: relative; box-shadow: 0 4px 30px rgba(0,0,0,.5); border-radius: var(--radius); overflow: hidden; background: #1a1a1a; }
+#preview-canvas { display: block; border-radius: var(--radius); touch-action: none; }
+.drop-zone {
+  width: 300px; height: 520px; border: 2px dashed #444; border-radius: 16px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer;
+}
+.drop-zone svg { width: 40px; height: 40px; stroke: #555; margin-bottom: 10px; }
+.drop-zone p { color: #777; font-size: 14px; }
+.drop-zone .sub { font-size: 11px; color: #555; margin-top: 4px; }
+.status-bar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.65); padding: 3px 10px; border-radius: 20px; font-size: 10px; color: #888; pointer-events: none; white-space: nowrap; }
+#file-input { display: none; }
+
+/* ─── RIGHT PANEL (desktop) ─── */
+.panel {
+  width: 340px; border-left: 1px solid var(--bg4); background: var(--bg); display: flex; flex-direction: column; overflow: hidden;
+}
+.panel-tabs { display: flex; border-bottom: 1px solid var(--bg4); flex-shrink: 0; }
+.panel-tab {
+  flex: 1; padding: 10px 4px; text-align: center; font-size: 11px; font-weight: 500;
+  color: var(--fg3); cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s;
+}
+.panel-tab:hover { color: var(--fg2); }
+.panel-tab.active { color: #fff; border-bottom-color: var(--accent); }
+.panel-body { flex: 1; overflow-y: auto; }
+.panel-body::-webkit-scrollbar { width: 3px; }
+.panel-body::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+.tab-pane { display: none; padding: 14px; }
+.tab-pane.active { display: block; }
+
+/* ─── Shared Controls ─── */
+.section { margin-bottom: 16px; }
+.section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--fg3); margin-bottom: 8px; font-weight: 600; }
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.row label { font-size: 12px; color: var(--fg2); min-width: 48px; flex-shrink: 0; }
+.row input[type="range"] { flex: 1; accent-color: var(--accent); height: 3px; }
+.row .val { font-size: 11px; color: var(--fg3); min-width: 32px; text-align: right; font-variant-numeric: tabular-nums; }
+.row input[type="color"] { width: 28px; height: 28px; border: 2px solid var(--bg4); border-radius: 6px; cursor: pointer; background: none; padding: 0; }
+select { background: var(--bg3); color: var(--fg); border: 1px solid var(--bg4); border-radius: 6px; padding: 7px 8px; font-size: 12px; width: 100%; }
+textarea { width: 100%; background: var(--bg3); border: 1px solid var(--bg4); border-radius: 6px; padding: 7px 8px; color: var(--fg); font-size: 13px; font-family: inherit; resize: vertical; min-height: 44px; }
+input[type="text"] { background: var(--bg3); color: var(--fg); border: 1px solid var(--bg4); border-radius: 6px; padding: 7px 8px; font-size: 12px; width: 100%; }
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; padding: 9px 14px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .12s; width: 100%; min-height: 40px; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-secondary { background: var(--bg4); color: #ccc; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn:disabled { opacity: .35; pointer-events: none; }
+.btn + .btn { margin-top: 6px; }
+.btn-row { display: flex; gap: 6px; }
+.btn-row .btn { flex: 1; }
+.btn-sm { padding: 5px 10px; font-size: 11px; min-height: 28px; width: auto; }
+
+.chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.chip {
+  padding: 5px 10px; background: var(--bg3); border: 1px solid var(--bg4); border-radius: 6px;
+  color: var(--fg2); font-size: 11px; cursor: pointer; transition: all .12s;
+}
+.chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.check-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.check-row input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+.check-row label { font-size: 12px; color: var(--fg2); cursor: pointer; }
+
+.text-entry { margin-bottom: 8px; padding: 10px; background: var(--bg3); border-radius: 8px; border: 1px solid #1c1c1c; }
+.text-entry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.text-entry-header span { font-size: 11px; color: var(--fg3); font-weight: 600; }
+.remove-text { background: none; border: none; color: #555; cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; }
+.remove-text:hover { color: var(--danger); }
+
+.font-search-wrap { position: relative; margin-bottom: 8px; }
+.font-search-wrap input { padding-right: 56px; }
+.font-search-wrap .btn-sm { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
+.font-list { max-height: 150px; overflow-y: auto; border: 1px solid var(--bg4); border-radius: 6px; background: #131313; }
+.font-list:empty { display: none; }
+.font-item { padding: 7px 10px; font-size: 12px; color: #bbb; cursor: pointer; border-bottom: 1px solid #1a1a1a; }
+.font-item:hover { background: var(--bg4); color: #fff; }
+.font-item:last-child { border-bottom: none; }
+.loaded-fonts { display: flex; flex-wrap: wrap; gap: 4px; }
+.font-tag { padding: 3px 8px; background: #1e1e1e; border-radius: 4px; font-size: 10px; color: #aaa; display: flex; align-items: center; gap: 3px; }
+.font-tag button { background: none; border: none; color: #555; cursor: pointer; font-size: 12px; }
+
+/* ─── MOBILE BOTTOM SHEET ─── */
+.mobile-bar { display: none; }
+
+@media (max-width: 768px) {
+  .app { flex-direction: column; }
+  .preview-area { flex: 1; padding: 10px; padding-bottom: 0; }
+  .drop-zone { width: 240px; height: 380px; }
+  .drop-zone svg { width: 32px; height: 32px; }
+  .drop-zone p { font-size: 13px; }
+  .panel { display: none; }
+
+  .mobile-bar {
+    display: flex; flex-shrink: 0; background: var(--bg); border-top: 1px solid var(--bg4);
+    padding: 6px 8px; padding-bottom: calc(6px + var(--safe-b)); gap: 4px; overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mobile-bar::-webkit-scrollbar { display: none; }
+  .m-btn {
+    flex-shrink: 0; padding: 8px 14px; background: var(--bg3); border: 1px solid var(--bg4); border-radius: 20px;
+    color: var(--fg2); font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;
+  }
+  .m-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .m-btn.m-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .m-btn.m-upload { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+
+  .mobile-sheet {
+    display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: var(--bg); border-top: 1px solid var(--bg4); border-radius: 16px 16px 0 0;
+    max-height: 55dvh; overflow-y: auto; padding: 12px 16px; padding-bottom: calc(16px + var(--safe-b));
+    box-shadow: 0 -4px 30px rgba(0,0,0,.6);
+  }
+  .mobile-sheet.open { display: block; }
+  .sheet-handle { width: 36px; height: 4px; background: #444; border-radius: 4px; margin: 0 auto 12px; }
+  .sheet-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; text-align: center; }
+
+  .mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 99; }
+  .mobile-overlay.open { display: block; }
+
+  /* Bigger touch targets on mobile */
+  .row input[type="range"] { height: 6px; }
+  select, textarea, input[type="text"] { font-size: 16px; padding: 10px; min-height: 44px; }
+  .btn { min-height: 44px; font-size: 14px; }
+  .chip { padding: 8px 14px; font-size: 12px; }
+  .check-row input[type="checkbox"] { width: 20px; height: 20px; }
+  .check-row label { font-size: 13px; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Preview -->
+  <div class="preview-area" id="preview-area">
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <p>이미지를 업로드하세요</p>
+      <p class="sub">탭하거나 드래그</p>
+    </div>
+    <div class="canvas-wrap" id="canvas-wrap" style="display:none">
+      <canvas id="preview-canvas"></canvas>
+    </div>
+    <div class="status-bar" id="status-bar" style="display:none"></div>
+    <input type="file" id="file-input" accept="image/*">
+  </div>
+
+  <!-- Desktop Panel -->
+  <div class="panel" id="desktop-panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" data-tab="image">이미지</div>
+      <div class="panel-tab" data-tab="overlay">오버레이</div>
+      <div class="panel-tab" data-tab="text">텍스트</div>
+      <div class="panel-tab" data-tab="font">폰트</div>
+      <div class="panel-tab" data-tab="export">저장</div>
+    </div>
+    <div class="panel-body">
+      <!-- IMAGE -->
+      <div class="tab-pane active" id="tab-image">
+        <div class="section">
+          <div class="section-title">비율</div>
+          <div class="chips" id="ratio-chips">
+            <button class="chip active" data-ratio="9:16">9:16</button>
+            <button class="chip" data-ratio="4:5">4:5</button>
+            <button class="chip" data-ratio="1:1">1:1</button>
+            <button class="chip" data-ratio="16:9">16:9</button>
+            <button class="chip" data-ratio="original">원본</button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">크기 & 위치</div>
+          <div class="row"><label>크기</label><input type="range" id="img-scale" min="10" max="200" value="100"><span class="val" id="img-scale-val">100%</span></div>
+          <div class="row"><label>X</label><input type="range" id="img-x" min="-50" max="50" value="0"><span class="val" id="img-x-val">0</span></div>
+          <div class="row"><label>Y</label><input type="range" id="img-y" min="-50" max="50" value="0"><span class="val" id="img-y-val">0</span></div>
+          <div class="row"><label>맞춤</label><select id="img-fit"><option value="cover">꽉 채우기</option><option value="contain">맞추기</option><option value="free">자유</option></select></div>
+          <button class="btn btn-secondary btn-sm" id="img-reset-pos" style="margin-top:4px;width:auto">위치 초기화</button>
+        </div>
+        <div class="section">
+          <div class="section-title">블러 배경</div>
+          <div class="check-row"><input type="checkbox" id="blur-enabled"><label for="blur-enabled">블러 배경 사용</label></div>
+          <div class="row"><label>블러</label><input type="range" id="blur-amount" min="5" max="60" value="25"><span class="val" id="blur-amount-val">25px</span></div>
+          <div class="row"><label>밝기</label><input type="range" id="blur-brightness" min="10" max="100" value="40"><span class="val" id="blur-brightness-val">40%</span></div>
+        </div>
+        <button class="btn btn-secondary" onclick="$('#file-input').click()">다른 이미지</button>
+        <button class="btn btn-danger" id="reset-btn" disabled>초기화</button>
+      </div>
+
+      <!-- OVERLAY -->
+      <div class="tab-pane" id="tab-overlay">
+        <div class="section">
+          <div class="section-title">그라데이션</div>
+          <div class="row"><label>방향</label><select id="grad-direction"><option value="bottom">아래→위</option><option value="top">위→아래</option><option value="both">양쪽</option><option value="full">전체</option><option value="radial">비네팅</option></select></div>
+          <div class="row"><label>강도</label><input type="range" id="grad-opacity" min="0" max="100" value="70"><span class="val" id="grad-opacity-val">70%</span></div>
+          <div class="row"><label>범위</label><input type="range" id="grad-size" min="10" max="100" value="55"><span class="val" id="grad-size-val">55%</span></div>
+          <div class="row"><label>색상</label><input type="color" id="grad-color" value="#000000"></div>
+        </div>
+      </div>
+
+      <!-- TEXT -->
+      <div class="tab-pane" id="tab-text">
+        <div id="text-list"></div>
+        <button class="btn btn-secondary" id="add-text-btn">+ 텍스트 추가</button>
+      </div>
+
+      <!-- FONT -->
+      <div class="tab-pane" id="tab-font">
+        <div class="section" id="local-font-section">
+          <div class="section-title">내 컴퓨터 폰트</div>
+          <button class="btn btn-secondary" id="load-local-fonts-btn">로컬 폰트 불러오기</button>
+          <p id="local-font-status" style="font-size:11px;color:#555;margin-top:6px"></p>
+          <div class="font-search-wrap" id="local-font-search-wrap" style="display:none;margin-top:8px"><input type="text" id="local-font-filter" placeholder="로컬 폰트 검색..."></div>
+          <div class="font-list" id="local-font-list" style="max-height:150px"></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Google Fonts</div>
+          <div class="font-search-wrap"><input type="text" id="font-search" placeholder="폰트 이름 (예: Noto Sans KR)"><button class="btn btn-primary btn-sm" id="font-search-btn">검색</button></div>
+          <div class="font-list" id="font-results"></div>
+        </div>
+        <div class="section">
+          <div class="section-title">로드된 폰트</div>
+          <div class="loaded-fonts" id="loaded-fonts"></div>
+        </div>
+      </div>
+
+      <!-- EXPORT -->
+      <div class="tab-pane" id="tab-export">
+        <div class="section">
+          <div class="row"><label>해상도</label><select id="export-scale"><option value="1">1x</option><option value="2" selected>2x</option><option value="3">3x</option></select></div>
+          <div class="row"><label>포맷</label><select id="export-format"><option value="png">PNG</option><option value="jpeg">JPG</option><option value="webp">WebP</option></select></div>
+          <div class="row"><label>품질</label><input type="range" id="export-quality" min="50" max="100" value="92"><span class="val" id="export-quality-val">92%</span></div>
+          <button class="btn btn-primary" id="download-btn" disabled>다운로드</button>
+          <p id="dl-tip" style="font-size:11px;color:var(--fg3);margin-top:6px;text-align:center"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile Bottom Bar -->
+<div class="mobile-bar" id="mobile-bar">
+  <button class="m-btn m-upload" onclick="$('#file-input').click()">사진</button>
+  <button class="m-btn" data-sheet="s-image">이미지</button>
+  <button class="m-btn" data-sheet="s-overlay">오버레이</button>
+  <button class="m-btn" data-sheet="s-text">텍스트</button>
+  <button class="m-btn" data-sheet="s-font">폰트</button>
+  <button class="m-btn m-primary" data-sheet="s-export">저장</button>
+</div>
+
+<!-- Mobile Overlay + Sheet -->
+<div class="mobile-overlay" id="mobile-overlay"></div>
+<div class="mobile-sheet" id="mobile-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title" id="sheet-title"></div>
+  <div id="sheet-body"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const isMobile = () => window.innerWidth <= 768;
+
+// ─── State ───
+const S = {
+  img: null, ratio: '9:16',
+  imgPos: { scale: 100, x: 0, y: 0, fit: 'cover' },
+  grad: { direction: 'bottom', opacity: 70, size: 55, color: '#000000' },
+  blur: { enabled: false, amount: 25, brightness: 40 },
+  texts: [],
+  fonts: [
+    { name: 'System Sans', family: 'sans-serif', loaded: true, builtin: true },
+    { name: 'System Serif', family: 'serif', loaded: true, builtin: true },
+    { name: 'Monospace', family: 'monospace', loaded: true, builtin: true },
+  ],
+  exportScale: 2, exportFormat: 'png', exportQuality: 92,
+  dragging: null, dragType: null, dragStart: { x: 0, y: 0 },
+};
+const RATIOS = { '9:16': 9/16, '4:5': 4/5, '1:1': 1, '16:9': 16/9, 'original': null };
+const canvas = $('#preview-canvas');
+const ctx = canvas.getContext('2d');
+
+// ─── Desktop Tabs ───
+$$('.panel-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    $$('.panel-tab').forEach(t => t.classList.remove('active'));
+    $$('.tab-pane').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    $(`#tab-${tab.dataset.tab}`).classList.add('active');
+  });
+});
+
+// ─── Mobile Sheet ───
+const sheetTitles = { 's-image': '이미지 설정', 's-overlay': '오버레이', 's-text': '텍스트', 's-font': '폰트', 's-export': '저장' };
+const sheetTabs = { 's-image': 'image', 's-overlay': 'overlay', 's-text': 'text', 's-font': 'font', 's-export': 'export' };
+
+$$('.m-btn[data-sheet]').forEach(btn => {
+  btn.addEventListener('click', () => openSheet(btn.dataset.sheet));
+});
+
+function openSheet(id) {
+  const tabName = sheetTabs[id];
+  const sourcePane = $(`#tab-${tabName}`);
+  if (!sourcePane) return;
+  $('#sheet-title').textContent = sheetTitles[id] || '';
+  $('#sheet-body').innerHTML = sourcePane.innerHTML;
+  $('#mobile-sheet').classList.add('open');
+  $('#mobile-overlay').classList.add('open');
+  rebindSheetControls(tabName);
+}
+
+function closeSheet() {
+  $('#mobile-sheet').classList.remove('open');
+  $('#mobile-overlay').classList.remove('open');
+}
+
+$('#mobile-overlay').addEventListener('click', closeSheet);
+
+// Re-sync sheet controls → state
+function rebindSheetControls(tabName) {
+  const body = $('#sheet-body');
+
+  // Ratio chips
+  body.querySelectorAll('[data-ratio]').forEach(chip => {
+    if (chip.dataset.ratio === S.ratio) { chip.classList.add('active'); } else { chip.classList.remove('active'); }
+    chip.addEventListener('click', () => {
+      body.querySelectorAll('[data-ratio]').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      S.ratio = chip.dataset.ratio;
+      // sync desktop
+      $$('#ratio-chips .chip').forEach(c => { c.classList.toggle('active', c.dataset.ratio === S.ratio); });
+      render();
+    });
+  });
+
+  // Sliders
+  body.querySelectorAll('input[type="range"]').forEach(el => {
+    const id = el.id;
+    if (!id) return;
+    // Set current value
+    if (id === 'img-scale') el.value = S.imgPos.scale;
+    if (id === 'img-x') el.value = S.imgPos.x;
+    if (id === 'img-y') el.value = S.imgPos.y;
+    if (id === 'blur-amount') el.value = S.blur.amount;
+    if (id === 'blur-brightness') el.value = S.blur.brightness;
+    if (id === 'grad-opacity') el.value = S.grad.opacity;
+    if (id === 'grad-size') el.value = S.grad.size;
+    if (id === 'export-quality') el.value = S.exportQuality;
+
+    el.addEventListener('input', () => {
+      handleSlider(id, +el.value);
+      const valEl = el.nextElementSibling;
+      if (valEl) valEl.textContent = formatVal(id, +el.value);
+    });
+  });
+
+  // Selects
+  body.querySelectorAll('select').forEach(el => {
+    const id = el.id;
+    if (id === 'img-fit') el.value = S.imgPos.fit;
+    if (id === 'grad-direction') el.value = S.grad.direction;
+    if (id === 'export-scale') el.value = S.exportScale;
+    if (id === 'export-format') el.value = S.exportFormat;
+    el.addEventListener('change', () => handleSelect(id, el.value));
+  });
+
+  // Checkboxes
+  body.querySelectorAll('input[type="checkbox"]').forEach(el => {
+    if (el.id === 'blur-enabled') el.checked = S.blur.enabled;
+    el.addEventListener('change', () => handleCheck(el.id, el.checked));
+  });
+
+  // Buttons
+  const resetPos = body.querySelector('#img-reset-pos');
+  if (resetPos) resetPos.addEventListener('click', resetImgPos);
+  const resetBtn = body.querySelector('#reset-btn');
+  if (resetBtn) { resetBtn.disabled = !S.img; resetBtn.addEventListener('click', resetAll); }
+  const dlBtn = body.querySelector('#download-btn');
+  if (dlBtn) { dlBtn.disabled = !S.img; dlBtn.addEventListener('click', exportImage); }
+  const addTxt = body.querySelector('#add-text-btn');
+  if (addTxt) addTxt.addEventListener('click', () => { addText(); closeSheet(); setTimeout(() => openSheet('s-text'), 100); });
+
+  // Text entries
+  rebindTextEvents(body);
+
+  // Font
+  const localBtn = body.querySelector('#load-local-fonts-btn');
+  if (localBtn) localBtn.addEventListener('click', loadLocalFonts);
+  const gfBtn = body.querySelector('#font-search-btn');
+  if (gfBtn) gfBtn.addEventListener('click', () => searchGFonts(body));
+  const gfInput = body.querySelector('#font-search');
+  if (gfInput) gfInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchGFonts(body); });
+
+  // Download tip
+  const tip = body.querySelector('#dl-tip');
+  if (tip) {
+    const isiOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    tip.textContent = isiOS ? '다운로드 후 "사진" 앱에 저장됩니다' : '';
+  }
+}
+
+function rebindTextEvents(container) {
+  container.querySelectorAll('.remove-text').forEach(b => b.onclick = () => { removeText(+b.dataset.id); closeSheet(); setTimeout(() => openSheet('s-text'), 50); });
+  container.querySelectorAll('textarea[data-field="content"]').forEach(el => el.oninput = () => { findText(+el.dataset.id).content = el.value; render(); });
+  container.querySelectorAll('.text-entry input[type="range"]').forEach(el => {
+    el.oninput = () => {
+      const t = findText(+el.dataset.id), f = el.dataset.field;
+      if (f === 'y') t.y = +el.value / 100; else t[f] = +el.value;
+      const valEl = el.nextElementSibling;
+      if (valEl) valEl.textContent = f === 'y' ? el.value + '%' : f === 'letterSpacing' ? el.value + 'px' : el.value;
+      render();
+    };
+  });
+  container.querySelectorAll('.text-entry input[type="color"]').forEach(el => { el.oninput = () => { findText(+el.dataset.id).color = el.value; render(); }; });
+  container.querySelectorAll('.align-btn-m').forEach(btn => { btn.onclick = () => { findText(+btn.dataset.id).align = btn.dataset.align; renderTextUI(); render(); }; });
+  container.querySelectorAll('.text-entry select').forEach(el => { el.onchange = () => { findText(+el.dataset.id)[el.dataset.field] = el.value; render(); }; });
+  container.querySelectorAll('.text-entry input[type="checkbox"]').forEach(el => { el.onchange = () => { findText(+el.dataset.id)[el.dataset.field] = el.checked; render(); }; });
+}
+
+// ─── Shared handlers ───
+function handleSlider(id, v) {
+  if (id === 'img-scale') { S.imgPos.scale = v; syncDesktop('img-scale', v); }
+  if (id === 'img-x') { S.imgPos.x = v; syncDesktop('img-x', v); }
+  if (id === 'img-y') { S.imgPos.y = v; syncDesktop('img-y', v); }
+  if (id === 'blur-amount') { S.blur.amount = v; }
+  if (id === 'blur-brightness') { S.blur.brightness = v; }
+  if (id === 'grad-opacity') { S.grad.opacity = v; }
+  if (id === 'grad-size') { S.grad.size = v; }
+  if (id === 'export-quality') { S.exportQuality = v; }
+  render();
+}
+
+function handleSelect(id, v) {
+  if (id === 'img-fit') S.imgPos.fit = v;
+  if (id === 'grad-direction') S.grad.direction = v;
+  if (id === 'export-scale') S.exportScale = +v;
+  if (id === 'export-format') S.exportFormat = v;
+  render();
+}
+
+function handleCheck(id, v) {
+  if (id === 'blur-enabled') S.blur.enabled = v;
+  render();
+}
+
+function formatVal(id, v) {
+  if (id === 'img-scale') return v + '%';
+  if (id.startsWith('blur-amount')) return v + 'px';
+  if (id.startsWith('blur-brightness') || id.startsWith('grad-opacity') || id.startsWith('grad-size') || id.startsWith('export-quality')) return v + '%';
+  return v;
+}
+
+function syncDesktop(id, v) {
+  const el = document.querySelector(`#desktop-panel #${id}`);
+  if (el) el.value = v;
+  const valEl = document.querySelector(`#desktop-panel #${id}-val`);
+  if (valEl) valEl.textContent = formatVal(id, v);
+}
+
+// ─── Desktop control bindings ───
+$('#img-scale').addEventListener('input', e => { S.imgPos.scale = +e.target.value; $('#img-scale-val').textContent = e.target.value + '%'; render(); });
+$('#img-x').addEventListener('input', e => { S.imgPos.x = +e.target.value; $('#img-x-val').textContent = e.target.value; render(); });
+$('#img-y').addEventListener('input', e => { S.imgPos.y = +e.target.value; $('#img-y-val').textContent = e.target.value; render(); });
+$('#img-fit').addEventListener('change', e => { S.imgPos.fit = e.target.value; render(); });
+$('#img-reset-pos').addEventListener('click', resetImgPos);
+$('#grad-direction').addEventListener('change', e => { S.grad.direction = e.target.value; render(); });
+$('#grad-opacity').addEventListener('input', e => { S.grad.opacity = +e.target.value; $('#grad-opacity-val').textContent = e.target.value + '%'; render(); });
+$('#grad-size').addEventListener('input', e => { S.grad.size = +e.target.value; $('#grad-size-val').textContent = e.target.value + '%'; render(); });
+$('#grad-color').addEventListener('input', e => { S.grad.color = e.target.value; render(); });
+$('#blur-enabled').addEventListener('change', e => { S.blur.enabled = e.target.checked; render(); });
+$('#blur-amount').addEventListener('input', e => { S.blur.amount = +e.target.value; $('#blur-amount-val').textContent = e.target.value + 'px'; render(); });
+$('#blur-brightness').addEventListener('input', e => { S.blur.brightness = +e.target.value; $('#blur-brightness-val').textContent = e.target.value + '%'; render(); });
+$('#export-scale').addEventListener('change', e => { S.exportScale = +e.target.value; render(); });
+$('#export-format').addEventListener('change', e => { S.exportFormat = e.target.value; });
+$('#export-quality').addEventListener('input', e => { S.exportQuality = +e.target.value; $('#export-quality-val').textContent = e.target.value + '%'; });
+$('#download-btn').addEventListener('click', exportImage);
+$('#add-text-btn').addEventListener('click', () => addText());
+$('#reset-btn').addEventListener('click', resetAll);
+$$('#ratio-chips .chip').forEach(c => { c.addEventListener('click', () => {
+  $$('#ratio-chips .chip').forEach(cc => cc.classList.remove('active'));
+  c.classList.add('active');
+  S.ratio = c.dataset.ratio;
+  render();
+}); });
+$('#load-local-fonts-btn').addEventListener('click', loadLocalFonts);
+$('#font-search-btn').addEventListener('click', () => searchGFonts(document));
+$('#font-search').addEventListener('keydown', e => { if (e.key === 'Enter') searchGFonts(document); });
+
+function resetImgPos() {
+  S.imgPos = { scale: 100, x: 0, y: 0, fit: S.imgPos.fit };
+  $('#img-scale').value = 100; $('#img-scale-val').textContent = '100%';
+  $('#img-x').value = 0; $('#img-x-val').textContent = '0';
+  $('#img-y').value = 0; $('#img-y-val').textContent = '0';
+  render();
+}
+
+function resetAll() {
+  S.img = null; S.texts = [];
+  renderTextUI();
+  $('#canvas-wrap').style.display = 'none';
+  $('#drop-zone').style.display = 'flex';
+  $('#status-bar').style.display = 'none';
+}
+
+// ─── File Input ───
+$('#file-input').addEventListener('change', e => { if (e.target.files[0]) loadImage(e.target.files[0]); });
+const previewArea = $('#preview-area');
+['dragover','dragenter'].forEach(ev => previewArea.addEventListener(ev, e => e.preventDefault()));
+previewArea.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) loadImage(f); });
+
+function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      S.img = img;
+      S.imgPos = { scale: 100, x: 0, y: 0, fit: 'cover' };
+      $('#drop-zone').style.display = 'none';
+      $('#canvas-wrap').style.display = 'block';
+      $('#status-bar').style.display = 'block';
+      $$('.btn').forEach(b => b.disabled = false);
+      closeSheet();
+      render();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ─── Touch & Mouse on Canvas ───
+let canvasDrag = null;
+let touchInfo = null;
+
+function getPos(e) {
+  const t = e.touches ? e.touches[0] : e;
+  const rect = canvas.getBoundingClientRect();
+  return { cx: t.clientX, cy: t.clientY, mx: (t.clientX - rect.left) * (canvas.width / rect.width), my: (t.clientY - rect.top) * (canvas.height / rect.height) };
+}
+
+function onPointerDown(e) {
+  if (!S.img) return;
+  const { cx, cy, mx, my } = getPos(e);
+
+  for (let i = S.texts.length - 1; i >= 0; i--) {
+    const t = S.texts[i];
+    const ty = t.y * canvas.height;
+    const fontSize = t.size * (canvas.width / 360);
+    if (Math.abs(my - ty) < fontSize * 1.3) {
+      S.dragging = t; S.dragType = 'text'; S.dragStart = { y: my - ty };
+      return;
+    }
+  }
+
+  canvasDrag = { startX: cx, startY: cy, origX: S.imgPos.x, origY: S.imgPos.y };
+}
+
+function onPointerMove(e) {
+  const { cx, cy, mx, my } = getPos(e);
+
+  if (S.dragging && S.dragType === 'text') {
+    S.dragging.y = Math.max(0.05, Math.min(0.95, (my - S.dragStart.y) / canvas.height));
+    render(); return;
+  }
+  if (canvasDrag) {
+    const dx = (cx - canvasDrag.startX) / 4;
+    const dy = (cy - canvasDrag.startY) / 4;
+    S.imgPos.x = Math.round(Math.max(-50, Math.min(50, canvasDrag.origX + dx)));
+    S.imgPos.y = Math.round(Math.max(-50, Math.min(50, canvasDrag.origY + dy)));
+    syncDesktop('img-x', S.imgPos.x); syncDesktop('img-y', S.imgPos.y);
+    render();
+  }
+}
+
+function onPointerUp() { S.dragging = null; S.dragType = null; canvasDrag = null; }
+
+canvas.addEventListener('mousedown', onPointerDown);
+canvas.addEventListener('mousemove', onPointerMove);
+canvas.addEventListener('mouseup', onPointerUp);
+canvas.addEventListener('mouseleave', onPointerUp);
+
+canvas.addEventListener('touchstart', e => { e.preventDefault(); if (e.touches.length === 1) onPointerDown(e); else if (e.touches.length === 2) { touchInfo = { dist: getTouchDist(e), scale: S.imgPos.scale }; } }, { passive: false });
+canvas.addEventListener('touchmove', e => { e.preventDefault(); if (e.touches.length === 1 && !touchInfo) onPointerMove(e); else if (e.touches.length === 2 && touchInfo) { const d = getTouchDist(e); S.imgPos.scale = Math.max(10, Math.min(200, Math.round(touchInfo.scale * (d / touchInfo.dist)))); syncDesktop('img-scale', S.imgPos.scale); render(); } }, { passive: false });
+canvas.addEventListener('touchend', e => { onPointerUp(); touchInfo = null; });
+
+function getTouchDist(e) { const [a, b] = [e.touches[0], e.touches[1]]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
+
+canvas.addEventListener('wheel', e => { if (!S.img) return; e.preventDefault(); S.imgPos.scale = Math.max(10, Math.min(200, S.imgPos.scale + (e.deltaY > 0 ? -5 : 5))); syncDesktop('img-scale', S.imgPos.scale); render(); }, { passive: false });
+
+// ─── Text ───
+function addText(content = '텍스트 입력') {
+  S.texts.push({ id: Date.now(), content, size: 28, weight: '700', color: '#ffffff', align: 'center', x: 0.5, y: 0.85, shadow: true, font: 'sans-serif', lineHeight: 1.3, letterSpacing: 0, strokeEnabled: false, strokeColor: '#000000', strokeWidth: 3 });
+  renderTextUI(); render();
+}
+function removeText(id) { S.texts = S.texts.filter(t => t.id !== id); renderTextUI(); render(); }
+function findText(id) { return S.texts.find(t => t.id === id); }
+
+function getFontOpts() { return S.fonts.map(f => `<option value="${f.family}">${f.name}</option>`).join(''); }
+
+function renderTextUI() {
+  const opts = getFontOpts();
+  const html = S.texts.map((t, i) => `
+    <div class="text-entry">
+      <div class="text-entry-header"><span>텍스트 ${i+1}</span><button class="remove-text" data-id="${t.id}">×</button></div>
+      <textarea data-id="${t.id}" data-field="content">${t.content}</textarea>
+      <div class="row" style="margin-top:6px"><label>크기</label><input type="range" min="10" max="80" value="${t.size}" data-id="${t.id}" data-field="size"><span class="val">${t.size}</span></div>
+      <div class="row"><label>위치</label><input type="range" min="0" max="100" value="${Math.round(t.y*100)}" data-id="${t.id}" data-field="y"><span class="val">${Math.round(t.y*100)}%</span></div>
+      <div class="row"><label>자간</label><input type="range" min="-5" max="20" value="${t.letterSpacing}" data-id="${t.id}" data-field="letterSpacing"><span class="val">${t.letterSpacing}px</span></div>
+      <div class="row"><label>색상</label><input type="color" value="${t.color}" data-id="${t.id}" data-field="color"></div>
+      <div class="row"><label>정렬</label><div class="chips"><button class="chip align-btn-m ${t.align==='left'?'active':''}" data-id="${t.id}" data-align="left">◀</button><button class="chip align-btn-m ${t.align==='center'?'active':''}" data-id="${t.id}" data-align="center">●</button><button class="chip align-btn-m ${t.align==='right'?'active':''}" data-id="${t.id}" data-align="right">▶</button></div></div>
+      <div class="row"><label>굵기</label><select data-id="${t.id}" data-field="weight" style="flex:1"><option value="400"${t.weight==='400'?' selected':''}>보통</option><option value="600"${t.weight==='600'?' selected':''}>세미볼드</option><option value="700"${t.weight==='700'?' selected':''}>볼드</option><option value="900"${t.weight==='900'?' selected':''}>블랙</option></select></div>
+      <div class="row"><label>폰트</label><select data-id="${t.id}" data-field="font" style="flex:1">${opts.replace(`value="${t.font}"`, `value="${t.font}" selected`)}</select></div>
+      <div class="check-row"><input type="checkbox" ${t.shadow?'checked':''} data-id="${t.id}" data-field="shadow" id="sh-${t.id}"><label for="sh-${t.id}">그림자</label></div>
+      <div class="check-row"><input type="checkbox" ${t.strokeEnabled?'checked':''} data-id="${t.id}" data-field="strokeEnabled" id="st-${t.id}"><label for="st-${t.id}">외곽선</label></div>
+    </div>`).join('');
+  $('#text-list').innerHTML = html;
+  // Bind desktop text events
+  rebindTextEvents($('#text-list'));
+}
+
+// ─── Fonts ───
+let localFontFamilies = [];
+const POPULAR_FONTS = ['Noto Sans KR','Noto Serif KR','Black Han Sans','Jua','Do Hyeon','Gothic A1','Nanum Gothic','Nanum Myeongjo','Nanum Pen Script','Sunflower','Gamja Flower','East Sea Dokdo','Song Myung','Gaegu','IBM Plex Sans KR','Gowun Dodum','Gowun Batang','Hahmlet','Roboto','Montserrat','Poppins','Inter','Playfair Display','Oswald','Lato','Open Sans','Raleway','Bebas Neue'];
+
+async function loadLocalFonts() {
+  const statusEl = document.querySelector('#local-font-status') || document.querySelector('#sheet-body #local-font-status');
+  if (!statusEl) return;
+  if (!('queryLocalFonts' in window)) { statusEl.textContent = 'Chrome 103+ 데스크탑에서만 지원'; statusEl.style.color = '#ef4444'; return; }
+  try {
+    statusEl.textContent = '불러오는 중...'; statusEl.style.color = '#888';
+    const fonts = await window.queryLocalFonts();
+    const map = new Map();
+    for (const f of fonts) { if (!map.has(f.family)) map.set(f.family, f); }
+    localFontFamilies = [...map.values()].sort((a,b) => a.family.localeCompare(b.family));
+    statusEl.textContent = `${localFontFamilies.length}개 발견`; statusEl.style.color = '#4ade80';
+    const wrap = statusEl.parentElement.querySelector('#local-font-search-wrap');
+    if (wrap) { wrap.style.display = 'block'; wrap.querySelector('input').addEventListener('input', e => renderLocalList(e.target.value.trim().toLowerCase(), statusEl.parentElement)); }
+    renderLocalList('', statusEl.parentElement);
+  } catch (err) { statusEl.textContent = err.name === 'NotAllowedError' ? '권한이 거부됨' : err.message; statusEl.style.color = '#ef4444'; }
+}
+
+function renderLocalList(q, container) {
+  const filtered = q ? localFontFamilies.filter(f => f.family.toLowerCase().includes(q)) : localFontFamilies.slice(0, 50);
+  const el = container.querySelector('#local-font-list');
+  if (!el) return;
+  el.innerHTML = filtered.slice(0, 80).map(f => `<div class="font-item" data-local-font="${f.family}" style="font-family:'${f.family}'">${f.family}</div>`).join('');
+  if (!filtered.length) el.innerHTML = '<div class="font-item" style="color:#555">없음</div>';
+  el.querySelectorAll('[data-local-font]').forEach(it => it.onclick = () => addFont(it.dataset.localFont, true));
+}
+
+function searchGFonts(container) {
+  const input = container.querySelector('#font-search');
+  const el = container.querySelector('#font-results');
+  if (!input || !el) return;
+  const q = input.value.trim().toLowerCase();
+  const res = q ? POPULAR_FONTS.filter(f => f.toLowerCase().includes(q)) : POPULAR_FONTS;
+  el.innerHTML = res.map(f => `<div class="font-item" data-gfont="${f}">${f}</div>`).join('');
+  if (!res.length && q) el.innerHTML = `<div class="font-item" data-gfont="${input.value.trim()}" style="color:var(--accent)">"${input.value.trim()}" 직접 추가</div>`;
+  el.querySelectorAll('[data-gfont]').forEach(it => it.onclick = () => addFont(it.dataset.gfont, false));
+}
+
+function addFont(name, isLocal) {
+  if (S.fonts.find(f => f.name === name)) { alert(`"${name}" 이미 추가됨`); return; }
+  if (!isLocal) {
+    const link = document.createElement('link');
+    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(name)}:wght@400;600;700;900&display=swap`;
+    link.rel = 'stylesheet'; document.head.appendChild(link);
+  }
+  S.fonts.push({ name, family: isLocal ? `'${name}'` : `'${name}', sans-serif`, loaded: true, builtin: false, local: !!isLocal });
+  renderLoadedFonts(); renderTextUI(); render();
+}
+
+function removeFont(name) {
+  const font = S.fonts.find(f => f.name === name);
+  if (font) S.texts.forEach(t => { if (t.font === font.family) t.font = 'sans-serif'; });
+  S.fonts = S.fonts.filter(f => f.name !== name);
+  renderLoadedFonts(); renderTextUI(); render();
+}
+
+function renderLoadedFonts() {
+  const html = S.fonts.map(f => {
+    const badge = f.builtin ? '' : f.local ? ' <span style="color:var(--success);font-size:9px">LOCAL</span>' : ' <span style="color:var(--accent2);font-size:9px">GOOGLE</span>';
+    const rm = f.builtin ? '' : `<button onclick="removeFont('${f.name.replace(/'/g,"\\'")}')">×</button>`;
+    return `<span class="font-tag">${f.name}${badge}${rm}</span>`;
+  }).join('');
+  $('#loaded-fonts').innerHTML = html;
+}
+renderLoadedFonts();
+
+// ─── Export ───
+function exportImage() {
+  if (!S.img) return;
+  try {
+    const scale = S.exportScale;
+    const { w, h } = getCanvasSize(scale);
+    const off = document.createElement('canvas');
+    off.width = w; off.height = h;
+    drawToCanvas(off, scale);
+    const fmt = S.exportFormat;
+    const mime = fmt === 'jpeg' ? 'image/jpeg' : fmt === 'webp' ? 'image/webp' : 'image/png';
+    const q = fmt === 'png' ? undefined : S.exportQuality / 100;
+
+    off.toBlob(blob => {
+      if (!blob) { alert('생성 실패'); return; }
+      const url = URL.createObjectURL(blob);
+
+      // 모바일: 새 탭에서 이미지 열기 (길게 눌러 저장)
+      if (isMobile()) {
+        const win = window.open();
+        if (win) {
+          win.document.write(`<html><head><meta name="viewport" content="width=device-width"><title>저장하기</title><style>body{margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh}img{max-width:100%;max-height:100vh}p{position:fixed;top:12px;left:0;right:0;text-align:center;color:#fff;font:14px sans-serif;background:rgba(0,0,0,.7);padding:8px;z-index:1}</style></head><body><p>이미지를 길게 눌러 저장하세요</p><img src="${url}"></body></html>`);
+          win.document.close();
+        } else {
+          // 팝업 차단 시 직접 링크
+          const a = document.createElement('a');
+          a.href = url; a.download = `cover_${Date.now()}.${fmt === 'jpeg' ? 'jpg' : fmt}`;
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        }
+      } else {
+        const a = document.createElement('a');
+        a.download = `cover_${Date.now()}.${fmt === 'jpeg' ? 'jpg' : fmt}`;
+        a.href = url; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      closeSheet();
+    }, mime, q);
+  } catch (err) { alert('오류: ' + err.message); }
+}
+
+// ─── Render Engine ───
+function getCanvasSize(scale = 1) {
+  if (!S.img) return { w: 360, h: 640 };
+  const ratio = RATIOS[S.ratio];
+  let w, h;
+  if (!ratio) { w = S.img.width * scale; h = S.img.height * scale; }
+  else if (ratio < 1) { w = 1080 * scale; h = Math.round(w / ratio); }
+  else { h = 1080 * scale; w = Math.round(h * ratio); }
+  return { w, h };
+}
+
+function drawImage(tCtx, w, h, isBlurBg) {
+  const img = S.img, imgR = img.width / img.height, canR = w / h;
+  const fit = isBlurBg ? 'cover' : S.imgPos.fit;
+  const scl = isBlurBg ? 100 : S.imgPos.scale;
+  const offX = isBlurBg ? 0 : S.imgPos.x, offY = isBlurBg ? 0 : S.imgPos.y;
+  let dw, dh, dx, dy;
+  if (fit === 'cover') {
+    if (imgR > canR) { dh = h; dw = dh * imgR; } else { dw = w; dh = dw / imgR; }
+    dw *= scl/100; dh *= scl/100; dx = (w-dw)/2 + (offX/50)*(w/2); dy = (h-dh)/2 + (offY/50)*(h/2);
+  } else if (fit === 'contain') {
+    if (imgR > canR) { dw = w*0.9; dh = dw/imgR; } else { dh = h*0.85; dw = dh*imgR; }
+    dw *= scl/100; dh *= scl/100; dx = (w-dw)/2 + (offX/50)*(w/2); dy = (h-dh)/2 + (offY/50)*(h/2);
+  } else {
+    dw = img.width*(scl/100)*(w/1080); dh = img.height*(scl/100)*(w/1080);
+    dx = (w-dw)/2 + (offX/50)*(w/2); dy = (h-dh)/2 + (offY/50)*(h/2);
+  }
+  if (isBlurBg) tCtx.drawImage(img, dx-30, dy-30, dw+60, dh+60);
+  else tCtx.drawImage(img, dx, dy, dw, dh);
+}
+
+function drawGradient(tCtx, w, h) {
+  const { direction: d, opacity, size, color } = S.grad;
+  const a = opacity/100, sz = size/100;
+  const [r,g,b] = [parseInt(color.slice(1,3),16), parseInt(color.slice(3,5),16), parseInt(color.slice(5,7),16)];
+  const lin = (y0,y1) => { const gr = tCtx.createLinearGradient(0,y0,0,y1); gr.addColorStop(0,`rgba(${r},${g},${b},${a})`); gr.addColorStop(1,`rgba(${r},${g},${b},0)`); tCtx.fillStyle = gr; tCtx.fillRect(0,0,w,h); };
+  if (d==='bottom') lin(h, h*(1-sz));
+  else if (d==='top') lin(0, h*sz);
+  else if (d==='both') { lin(h, h*(1-sz)); lin(0, h*sz); }
+  else if (d==='full') { tCtx.fillStyle = `rgba(${r},${g},${b},${a*0.6})`; tCtx.fillRect(0,0,w,h); }
+  else if (d==='radial') { const gr = tCtx.createRadialGradient(w/2,h/2,Math.min(w,h)*0.2,w/2,h/2,Math.max(w,h)*0.7); gr.addColorStop(0,`rgba(${r},${g},${b},0)`); gr.addColorStop(1,`rgba(${r},${g},${b},${a})`); tCtx.fillStyle = gr; tCtx.fillRect(0,0,w,h); }
+}
+
+function drawText(tCtx, t, w, h) {
+  const fs = t.size * (w/360);
+  tCtx.save();
+  tCtx.font = `${t.weight} ${fs}px ${t.font}`;
+  tCtx.fillStyle = t.color; tCtx.textAlign = t.align; tCtx.textBaseline = 'middle';
+  if (t.shadow) { tCtx.shadowColor = 'rgba(0,0,0,0.7)'; tCtx.shadowBlur = fs*0.3; tCtx.shadowOffsetY = fs*0.05; }
+  const lines = t.content.split('\n'), lh = fs*t.lineHeight;
+  const startY = t.y*h - (lines.length*lh)/2 + lh/2;
+  const x = t.align==='left' ? w*0.06 : t.align==='right' ? w*0.94 : w/2;
+  lines.forEach((line,i) => {
+    const y = startY + i*lh;
+    if (t.letterSpacing > 0) { drawSpaced(tCtx, line, x, y, t.letterSpacing*(w/360), t, fs, w); }
+    else {
+      if (t.strokeEnabled) { tCtx.save(); tCtx.shadowColor='transparent'; tCtx.strokeStyle=t.strokeColor; tCtx.lineWidth=t.strokeWidth*(w/360); tCtx.lineJoin='round'; tCtx.strokeText(line,x,y); tCtx.restore(); if(t.shadow){tCtx.shadowColor='rgba(0,0,0,0.7)';tCtx.shadowBlur=fs*0.3;} }
+      tCtx.fillText(line,x,y);
+    }
+  });
+  tCtx.restore();
+}
+
+function drawSpaced(tCtx, text, x, y, sp, t, fs, w) {
+  const chars=[...text], widths=chars.map(c=>tCtx.measureText(c).width);
+  const tw=widths.reduce((a,b)=>a+b,0)+sp*(chars.length-1);
+  let cx=t.align==='center'?x-tw/2:t.align==='right'?x-tw:x;
+  chars.forEach((c,i)=>{
+    if(t.strokeEnabled){tCtx.save();tCtx.shadowColor='transparent';tCtx.strokeStyle=t.strokeColor;tCtx.lineWidth=t.strokeWidth*(w/360);tCtx.lineJoin='round';tCtx.strokeText(c,cx,y);tCtx.restore();}
+    tCtx.fillText(c,cx,y); cx+=widths[i]+sp;
+  });
+}
+
+function drawToCanvas(targetCanvas, scale = 1) {
+  const tCtx = targetCanvas.getContext('2d');
+  const { w, h } = getCanvasSize(scale);
+  targetCanvas.width = w; targetCanvas.height = h;
+  tCtx.imageSmoothingEnabled = true; tCtx.imageSmoothingQuality = 'high';
+  if (!S.img) return;
+  tCtx.fillStyle = '#000'; tCtx.fillRect(0,0,w,h);
+  if (S.blur.enabled) {
+    const bc = document.createElement('canvas'); bc.width=w; bc.height=h;
+    const bx = bc.getContext('2d'); bx.imageSmoothingEnabled=true; bx.imageSmoothingQuality='high';
+    drawImage(bx,w,h,true);
+    tCtx.save();
+    tCtx.filter = `blur(${S.blur.amount*scale}px) brightness(${S.blur.brightness/100})`;
+    const m = S.blur.amount*scale*2;
+    tCtx.drawImage(bc, -m, -m, w+m*2, h+m*2);
+    tCtx.restore();
+  }
+  tCtx.save(); tCtx.imageSmoothingEnabled=true; tCtx.imageSmoothingQuality='high';
+  drawImage(tCtx,w,h,false); tCtx.restore();
+  drawGradient(tCtx,w,h);
+  S.texts.forEach(t => drawText(tCtx,t,w,h));
+}
+
+function render() {
+  if (!S.img) return;
+  const { w, h } = getCanvasSize();
+  const area = $('#preview-area');
+  const maxW = area.clientWidth - (isMobile() ? 20 : 32);
+  const maxH = area.clientHeight - (isMobile() ? 20 : 32);
+  let dw, dh;
+  if (w/h > maxW/maxH) { dw = Math.min(w, maxW); dh = dw*(h/w); }
+  else { dh = Math.min(h, maxH); dw = dh*(w/h); }
+  canvas.style.width = dw+'px'; canvas.style.height = dh+'px';
+  const dpr = Math.min(window.devicePixelRatio || 1, isMobile() ? 1.5 : 2);
+  drawToCanvas(canvas, dpr);
+  const { w: rw, h: rh } = getCanvasSize(S.exportScale);
+  $('#status-bar').textContent = `${rw}×${rh} • ${S.ratio}`;
+}
+
+window.addEventListener('resize', () => { if (S.img) render(); });
+
+// Hide local font section on mobile (API not supported)
+if (isMobile()) {
+  const sec = $('#local-font-section');
+  if (sec) sec.style.display = 'none';
+}
+</script>
+</body>
+</html>
