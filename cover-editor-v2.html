@@ -163,6 +163,12 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
   .check-row input[type="checkbox"] { width: 20px; height: 20px; }
   .check-row label { font-size: 13px; }
 }
+.version-bar {
+  text-align: center; padding: 6px 12px; font-size: 10px; color: #444;
+  border-top: 1px solid #1a1a1a; background: var(--bg); flex-shrink: 0;
+  letter-spacing: .3px;
+}
+@media (max-width: 768px) { .version-bar { display: none; } }
 </style>
 </head>
 <body>
@@ -861,5 +867,6 @@ if (isMobile()) {
   if (sec) sec.style.display = 'none';
 }
 </script>
+<div class="version-bar">v2.1 · 2026-04-08</div>
 </body>
 </html>
