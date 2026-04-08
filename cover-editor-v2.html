@@ -217,8 +217,9 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
           <div class="section-title">이미지 맞춤</div>
           <div class="row"><label>맞춤</label><select id="img-fit"><option value="cover">꽉 채우기</option><option value="contain">맞추기</option></select></div>
         </div>
-        <div class="section">
+        <div class="section" id="blur-section" style="display:none">
           <div class="section-title">블러 배경</div>
+          <p style="font-size:11px;color:var(--fg3);margin-bottom:8px">"맞추기" 모드에서 빈 공간을 흐린 원본으로 채웁니다</p>
           <div class="check-row"><input type="checkbox" id="blur-enabled"><label for="blur-enabled">블러 배경 사용</label></div>
           <div class="row"><label>블러</label><input type="range" id="blur-amount" min="5" max="60" value="25"><span class="val" id="blur-amount-val">25px</span></div>
           <div class="row"><label>밝기</label><input type="range" id="blur-brightness" min="10" max="100" value="40"><span class="val" id="blur-brightness-val">40%</span></div>
@@ -415,6 +416,9 @@ function rebindSheetControls(tabName) {
   const addTxt = body.querySelector('#add-text-btn');
   if (addTxt) addTxt.addEventListener('click', () => { addText(); closeSheet(); setTimeout(() => openSheet('s-text'), 100); });
 
+  // Blur section visibility
+  updateSheetBlurVisibility();
+
   // Text entries
   rebindTextEvents(body);
 
@@ -463,11 +467,16 @@ function handleSlider(id, v) {
 }
 
 function handleSelect(id, v) {
-  if (id === 'img-fit') S.imgPos.fit = v;
+  if (id === 'img-fit') { S.imgPos.fit = v; updateBlurVisibility(); updateSheetBlurVisibility(); }
   if (id === 'grad-direction') S.grad.direction = v;
   if (id === 'export-scale') S.exportScale = +v;
   if (id === 'export-format') S.exportFormat = v;
   render();
+}
+
+function updateSheetBlurVisibility() {
+  const sec = document.querySelector('#sheet-body #blur-section');
+  if (sec) sec.style.display = S.imgPos.fit === 'contain' ? '' : 'none';
 }
 
 function handleCheck(id, v) {
@@ -489,7 +498,14 @@ function syncDesktop(id, v) {
 }
 
 // ─── Desktop control bindings ───
-$('#img-fit').addEventListener('change', e => { S.imgPos.fit = e.target.value; render(); });
+$('#img-fit').addEventListener('change', e => { S.imgPos.fit = e.target.value; updateBlurVisibility(); render(); });
+
+function updateBlurVisibility() {
+  const show = S.imgPos.fit === 'contain';
+  const sec = $('#blur-section');
+  if (sec) sec.style.display = show ? '' : 'none';
+  if (!show) { S.blur.enabled = false; const cb = $('#blur-enabled'); if (cb) cb.checked = false; }
+}
 $('#grad-direction').addEventListener('change', e => { S.grad.direction = e.target.value; render(); });
 $('#grad-opacity').addEventListener('input', e => { S.grad.opacity = +e.target.value; $('#grad-opacity-val').textContent = e.target.value + '%'; render(); });
 $('#grad-size').addEventListener('input', e => { S.grad.size = +e.target.value; $('#grad-size-val').textContent = e.target.value + '%'; render(); });
