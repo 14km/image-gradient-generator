@@ -35,6 +35,15 @@ button, select, input { font-family: inherit; }
 .drop-zone svg { width: 40px; height: 40px; stroke: #555; margin-bottom: 10px; }
 .drop-zone p { color: #777; font-size: 14px; }
 .drop-zone .sub { font-size: 11px; color: #555; margin-top: 4px; }
+#img-remove-btn {
+  position: absolute; top: 8px; right: 8px; z-index: 5;
+  width: 32px; height: 32px; border-radius: 50%; border: none;
+  background: rgba(0,0,0,.6); color: #fff; font-size: 16px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px); transition: background .15s;
+}
+#img-remove-btn:hover { background: rgba(239,68,68,.8); }
+@media (max-width: 768px) { #img-remove-btn { width: 36px; height: 36px; font-size: 18px; } }
 .status-bar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.65); padding: 3px 10px; border-radius: 20px; font-size: 10px; color: #888; pointer-events: none; white-space: nowrap; }
 #file-input { display: none; }
 
@@ -170,6 +179,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
     </div>
     <div class="canvas-wrap" id="canvas-wrap" style="display:none">
       <canvas id="preview-canvas"></canvas>
+      <button id="img-remove-btn" title="이미지 삭제" onclick="removeImage()">✕</button>
     </div>
     <div class="status-bar" id="status-bar" style="display:none"></div>
     <input type="file" id="file-input" accept="image/*">
@@ -198,12 +208,8 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
           </div>
         </div>
         <div class="section">
-          <div class="section-title">크기 & 위치</div>
-          <div class="row"><label>크기</label><input type="range" id="img-scale" min="10" max="200" value="100"><span class="val" id="img-scale-val">100%</span></div>
-          <div class="row"><label>X</label><input type="range" id="img-x" min="-50" max="50" value="0"><span class="val" id="img-x-val">0</span></div>
-          <div class="row"><label>Y</label><input type="range" id="img-y" min="-50" max="50" value="0"><span class="val" id="img-y-val">0</span></div>
-          <div class="row"><label>맞춤</label><select id="img-fit"><option value="cover">꽉 채우기</option><option value="contain">맞추기</option><option value="free">자유</option></select></div>
-          <button class="btn btn-secondary btn-sm" id="img-reset-pos" style="margin-top:4px;width:auto">위치 초기화</button>
+          <div class="section-title">이미지 맞춤</div>
+          <div class="row"><label>맞춤</label><select id="img-fit"><option value="cover">꽉 채우기</option><option value="contain">맞추기</option></select></div>
         </div>
         <div class="section">
           <div class="section-title">블러 배경</div>
@@ -366,9 +372,6 @@ function rebindSheetControls(tabName) {
     const id = el.id;
     if (!id) return;
     // Set current value
-    if (id === 'img-scale') el.value = S.imgPos.scale;
-    if (id === 'img-x') el.value = S.imgPos.x;
-    if (id === 'img-y') el.value = S.imgPos.y;
     if (id === 'blur-amount') el.value = S.blur.amount;
     if (id === 'blur-brightness') el.value = S.blur.brightness;
     if (id === 'grad-opacity') el.value = S.grad.opacity;
@@ -399,8 +402,6 @@ function rebindSheetControls(tabName) {
   });
 
   // Buttons
-  const resetPos = body.querySelector('#img-reset-pos');
-  if (resetPos) resetPos.addEventListener('click', resetImgPos);
   const resetBtn = body.querySelector('#reset-btn');
   if (resetBtn) { resetBtn.disabled = !S.img; resetBtn.addEventListener('click', resetAll); }
   const dlBtn = body.querySelector('#download-btn');
@@ -447,14 +448,11 @@ function rebindTextEvents(container) {
 
 // ─── Shared handlers ───
 function handleSlider(id, v) {
-  if (id === 'img-scale') { S.imgPos.scale = v; syncDesktop('img-scale', v); }
-  if (id === 'img-x') { S.imgPos.x = v; syncDesktop('img-x', v); }
-  if (id === 'img-y') { S.imgPos.y = v; syncDesktop('img-y', v); }
-  if (id === 'blur-amount') { S.blur.amount = v; }
-  if (id === 'blur-brightness') { S.blur.brightness = v; }
-  if (id === 'grad-opacity') { S.grad.opacity = v; }
-  if (id === 'grad-size') { S.grad.size = v; }
-  if (id === 'export-quality') { S.exportQuality = v; }
+  if (id === 'blur-amount') S.blur.amount = v;
+  if (id === 'blur-brightness') S.blur.brightness = v;
+  if (id === 'grad-opacity') S.grad.opacity = v;
+  if (id === 'grad-size') S.grad.size = v;
+  if (id === 'export-quality') S.exportQuality = v;
   render();
 }
 
@@ -472,7 +470,6 @@ function handleCheck(id, v) {
 }
 
 function formatVal(id, v) {
-  if (id === 'img-scale') return v + '%';
   if (id.startsWith('blur-amount')) return v + 'px';
   if (id.startsWith('blur-brightness') || id.startsWith('grad-opacity') || id.startsWith('grad-size') || id.startsWith('export-quality')) return v + '%';
   return v;
@@ -486,11 +483,7 @@ function syncDesktop(id, v) {
 }
 
 // ─── Desktop control bindings ───
-$('#img-scale').addEventListener('input', e => { S.imgPos.scale = +e.target.value; $('#img-scale-val').textContent = e.target.value + '%'; render(); });
-$('#img-x').addEventListener('input', e => { S.imgPos.x = +e.target.value; $('#img-x-val').textContent = e.target.value; render(); });
-$('#img-y').addEventListener('input', e => { S.imgPos.y = +e.target.value; $('#img-y-val').textContent = e.target.value; render(); });
 $('#img-fit').addEventListener('change', e => { S.imgPos.fit = e.target.value; render(); });
-$('#img-reset-pos').addEventListener('click', resetImgPos);
 $('#grad-direction').addEventListener('change', e => { S.grad.direction = e.target.value; render(); });
 $('#grad-opacity').addEventListener('input', e => { S.grad.opacity = +e.target.value; $('#grad-opacity-val').textContent = e.target.value + '%'; render(); });
 $('#grad-size').addEventListener('input', e => { S.grad.size = +e.target.value; $('#grad-size-val').textContent = e.target.value + '%'; render(); });
@@ -514,24 +507,32 @@ $('#load-local-fonts-btn').addEventListener('click', loadLocalFonts);
 $('#font-search-btn').addEventListener('click', () => searchGFonts(document));
 $('#font-search').addEventListener('keydown', e => { if (e.key === 'Enter') searchGFonts(document); });
 
-function resetImgPos() {
-  S.imgPos = { scale: 100, x: 0, y: 0, fit: S.imgPos.fit };
-  $('#img-scale').value = 100; $('#img-scale-val').textContent = '100%';
-  $('#img-x').value = 0; $('#img-x-val').textContent = '0';
-  $('#img-y').value = 0; $('#img-y-val').textContent = '0';
-  render();
+function removeImage() {
+  S.img = null;
+  S.imgPos = { scale: 100, x: 0, y: 0, fit: 'cover' };
+  $('#canvas-wrap').style.display = 'none';
+  $('#drop-zone').style.display = 'flex';
+  $('#status-bar').style.display = 'none';
+  // file input 초기화 (같은 파일 재업로드 가능하도록)
+  $('#file-input').value = '';
 }
 
 function resetAll() {
   S.img = null; S.texts = [];
+  S.imgPos = { scale: 100, x: 0, y: 0, fit: 'cover' };
   renderTextUI();
   $('#canvas-wrap').style.display = 'none';
   $('#drop-zone').style.display = 'flex';
   $('#status-bar').style.display = 'none';
+  $('#file-input').value = '';
 }
 
 // ─── File Input ───
-$('#file-input').addEventListener('change', e => { if (e.target.files[0]) loadImage(e.target.files[0]); });
+$('#file-input').addEventListener('change', e => {
+  if (e.target.files[0]) loadImage(e.target.files[0]);
+  // 중복 업로드 방지: 같은 파일 다시 선택 시에도 change 발생하도록 초기화
+  e.target.value = '';
+});
 const previewArea = $('#preview-area');
 ['dragover','dragenter'].forEach(ev => previewArea.addEventListener(ev, e => e.preventDefault()));
 previewArea.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) loadImage(f); });
@@ -556,8 +557,7 @@ function loadImage(file) {
 }
 
 // ─── Touch & Mouse on Canvas ───
-let canvasDrag = null;
-let touchInfo = null;
+// 텍스트 드래그용
 
 function getPos(e) {
   const t = e.touches ? e.touches[0] : e;
@@ -569,6 +569,7 @@ function onPointerDown(e) {
   if (!S.img) return;
   const { cx, cy, mx, my } = getPos(e);
 
+  // 텍스트 드래그만 지원
   for (let i = S.texts.length - 1; i >= 0; i--) {
     const t = S.texts[i];
     const ty = t.y * canvas.height;
@@ -578,41 +579,26 @@ function onPointerDown(e) {
       return;
     }
   }
-
-  canvasDrag = { startX: cx, startY: cy, origX: S.imgPos.x, origY: S.imgPos.y };
 }
 
 function onPointerMove(e) {
-  const { cx, cy, mx, my } = getPos(e);
-
   if (S.dragging && S.dragType === 'text') {
+    const { mx, my } = getPos(e);
     S.dragging.y = Math.max(0.05, Math.min(0.95, (my - S.dragStart.y) / canvas.height));
-    render(); return;
-  }
-  if (canvasDrag) {
-    const dx = (cx - canvasDrag.startX) / 4;
-    const dy = (cy - canvasDrag.startY) / 4;
-    S.imgPos.x = Math.round(Math.max(-50, Math.min(50, canvasDrag.origX + dx)));
-    S.imgPos.y = Math.round(Math.max(-50, Math.min(50, canvasDrag.origY + dy)));
-    syncDesktop('img-x', S.imgPos.x); syncDesktop('img-y', S.imgPos.y);
     render();
   }
 }
 
-function onPointerUp() { S.dragging = null; S.dragType = null; canvasDrag = null; }
+function onPointerUp() { S.dragging = null; S.dragType = null; }
 
 canvas.addEventListener('mousedown', onPointerDown);
 canvas.addEventListener('mousemove', onPointerMove);
 canvas.addEventListener('mouseup', onPointerUp);
 canvas.addEventListener('mouseleave', onPointerUp);
 
-canvas.addEventListener('touchstart', e => { e.preventDefault(); if (e.touches.length === 1) onPointerDown(e); else if (e.touches.length === 2) { touchInfo = { dist: getTouchDist(e), scale: S.imgPos.scale }; } }, { passive: false });
-canvas.addEventListener('touchmove', e => { e.preventDefault(); if (e.touches.length === 1 && !touchInfo) onPointerMove(e); else if (e.touches.length === 2 && touchInfo) { const d = getTouchDist(e); S.imgPos.scale = Math.max(10, Math.min(200, Math.round(touchInfo.scale * (d / touchInfo.dist)))); syncDesktop('img-scale', S.imgPos.scale); render(); } }, { passive: false });
-canvas.addEventListener('touchend', e => { onPointerUp(); touchInfo = null; });
-
-function getTouchDist(e) { const [a, b] = [e.touches[0], e.touches[1]]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
-
-canvas.addEventListener('wheel', e => { if (!S.img) return; e.preventDefault(); S.imgPos.scale = Math.max(10, Math.min(200, S.imgPos.scale + (e.deltaY > 0 ? -5 : 5))); syncDesktop('img-scale', S.imgPos.scale); render(); }, { passive: false });
+canvas.addEventListener('touchstart', e => { e.preventDefault(); if (e.touches.length === 1) onPointerDown(e); }, { passive: false });
+canvas.addEventListener('touchmove', e => { e.preventDefault(); if (e.touches.length === 1) onPointerMove(e); }, { passive: false });
+canvas.addEventListener('touchend', e => { onPointerUp(); });
 
 // ─── Text ───
 function addText(content = '텍스트 입력') {
@@ -758,28 +744,29 @@ function exportImage() {
 function getCanvasSize(scale = 1) {
   if (!S.img) return { w: 360, h: 640 };
   const ratio = RATIOS[S.ratio];
+  const MAX = 4096; // 최대 한 변 4096px 제한 (파일 크기 & 성능 밸런스)
   let w, h;
   if (!ratio) { w = S.img.width * scale; h = S.img.height * scale; }
   else if (ratio < 1) { w = 1080 * scale; h = Math.round(w / ratio); }
   else { h = 1080 * scale; w = Math.round(h * ratio); }
+  // 최대 크기 초과 시 비율 유지하며 축소
+  if (w > MAX || h > MAX) {
+    const s = MAX / Math.max(w, h);
+    w = Math.round(w * s); h = Math.round(h * s);
+  }
   return { w, h };
 }
 
 function drawImage(tCtx, w, h, isBlurBg) {
   const img = S.img, imgR = img.width / img.height, canR = w / h;
   const fit = isBlurBg ? 'cover' : S.imgPos.fit;
-  const scl = isBlurBg ? 100 : S.imgPos.scale;
-  const offX = isBlurBg ? 0 : S.imgPos.x, offY = isBlurBg ? 0 : S.imgPos.y;
   let dw, dh, dx, dy;
   if (fit === 'cover') {
     if (imgR > canR) { dh = h; dw = dh * imgR; } else { dw = w; dh = dw / imgR; }
-    dw *= scl/100; dh *= scl/100; dx = (w-dw)/2 + (offX/50)*(w/2); dy = (h-dh)/2 + (offY/50)*(h/2);
-  } else if (fit === 'contain') {
+    dx = (w-dw)/2; dy = (h-dh)/2;
+  } else { // contain
     if (imgR > canR) { dw = w*0.9; dh = dw/imgR; } else { dh = h*0.85; dw = dh*imgR; }
-    dw *= scl/100; dh *= scl/100; dx = (w-dw)/2 + (offX/50)*(w/2); dy = (h-dh)/2 + (offY/50)*(h/2);
-  } else {
-    dw = img.width*(scl/100)*(w/1080); dh = img.height*(scl/100)*(w/1080);
-    dx = (w-dw)/2 + (offX/50)*(w/2); dy = (h-dh)/2 + (offY/50)*(h/2);
+    dx = (w-dw)/2; dy = (h-dh)/2;
   }
   if (isBlurBg) tCtx.drawImage(img, dx-30, dy-30, dw+60, dh+60);
   else tCtx.drawImage(img, dx, dy, dw, dh);
